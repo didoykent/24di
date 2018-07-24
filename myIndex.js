@@ -15,7 +15,7 @@ var users = [];
 
 
 
-server.listen(8890);
+server.listen(7740);
 
 
 io.on('connection', function(socket){
@@ -87,16 +87,16 @@ else if(clients.length <2){
                  io.to(latestmessage.friend['current_conn_id']).emit('messageNotification', {bonusdata: latestmessage.myId, myunread: latestmessage})
 
                  io.to(latestmessage.friend['previous_conn_id']).emit('messageNotification', {bonusdata: latestmessage.myId, myunread: latestmessage})
-       console.log('fckk')
+
                }
 
                else{
 
                    io.to(latestmessage.friend['previous_conn_id']).emit('messageNotification', {bonusdata: latestmessage.myId, myunread: latestmessage})
-                  
-                    console.log(socket.id)
 
-       console.log('fck')
+
+
+
                }
 
 

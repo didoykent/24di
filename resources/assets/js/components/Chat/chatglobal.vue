@@ -2,11 +2,8 @@
 <template>
 <div v-if = "!offFunction">
 
-  <q-layout>
-
-   <q-page-container>
   <q-page padding class="row justify-center">
-      <div style="width: 500px; max-width: 90vw;">
+      <div style="width: 500px; max-width: 90vw; margin-top: 50px;">
         <q-list highlight>
           <q-list-header>Recent chats</q-list-header>
           <template v-for="(user, index) in friendListsFilter">
@@ -14,78 +11,80 @@
           <q-item  @click.native="selectFriend(user.id, user.chatroute, user, index)">
             <q-item-side avatar="https://picsum.photos/80/80" />
             <q-item-main :label="user.en_name" />
-            <q-item-side right icon="chat_bubble" color="green" />
+            <q-item-side right icon="chat_bubble" :color="user.isActive ? 'green' : 'grey'" />
 
           </q-item>
 
 
 
         </template>
-          <q-item-separator />
-          <q-list-header>Previous chats</q-list-header>
-          <q-item>
-            <q-item-side avatar="https://picsum.photos/80/80" />
-            <q-item-main label="Jack Doe" />
-          </q-item>
+
+
         </q-list>
       </div>
       </q-page>
 
-    </q-page-container>
-  </q-layout>
+
 
 </div>
 
 <div v-else>
-  <q-layout>
-    <q-btn @click="$router.push({ name: 'SomePage' })" style= "background-color: transparent;"  icon="arrow back"></q-btn>
-   <q-page-container>
-     <q-page class="chat-page q-ma-xl"  >
 
-       <template  v-for="(item, index) in myMessages">
+  <q-page class="chat-page" >
+
+      <q-scroll-area   id ="chatScroll" ref="myScroll" class = "q-px-xl" style="width: 100vw; height: calc(-130px + 100vh); margin-top: 50px">
+          <div ref="scrollInner">
+        <template  v-for="(item, index) in myMessages">
+
 
        <q-chat-message
          :name="item.name"
          avatar="https://picsum.photos/80/80"
          :text="[item.message]"
          stamp="4 minutes ago"
-         sent
+         :sent = "currentUserName == item.name ? false: true"
+
+
+
+
       ></q-chat-message>
+
 
 </template>
 
+<q-scroll-observable   @scroll="scrollHandler" />
+</div>
+      </q-scroll-area>
+
+    </q-page>
+
+   <q-input
+        color="dark"
+        type="textarea"
+        ref="message"
+        class="row col-12 fixed-bottom full-width chat-message bg-white"
+       style="z-index: 1001; margin-top: 16px; overflow: auto;
+         overflow-x: hidden; max-height:20vh;  "
+        v-model="message"
+        float-label="What's your message?"
+
+
+        @keyup.enter="sendMessage()"
+        :after="[
+          { icon: 'cloud upload', handler() { upload() } },
+          { icon: 'send', handler() { sendMessage() } }
+        ]"
+     ></q-input>
+
+     <q-uploader
+            class="hidden"
+            ref="uploader"
+            url="http://localhost"
+            method="PUT"
+          ></q-uploader>
 
 
 
-     </q-page>
-
-
-   </q-page-container>
-
- </q-layout>
- <q-input
-          color="dark"
-          type="textarea"
-          ref="message"
-          class="row col-12 fixed-bottom full-width chat-message bg-white""
-         style="z-index: 1001; margin-top: 16px;   overflow: auto;
-           overflow-x: hidden; :max-height:20; "
-          v-model="message"
-          float-label="What's your message?"
-          @input="notifyClientIsTyping(), visualizeMessage()"
-          @focus="visualizeMessage()"
-          @keyup.enter="submit()"
-          :before="[{icon: 'arrow_back', handler () {}}]"
-          :after="[
-             { icon: 'cloud upload', handler() { submit() } },
-          {  icon: 'send', handler() { submit() } }
-
-
-          ]"
-
-        />
-
-<q-uploader :url="url" />
 </div>
 
 
@@ -95,6 +94,12 @@
   import Vue from 'vue'
   import axios from 'axios'
   import {mapGetters} from 'vuex'
+
+import { scroll } from "quasar-framework/dist/quasar.mat.esm.js";
+
+
+
+
   export default{
 
 
@@ -291,7 +296,7 @@
          axios.put(`/api/editMessage/${myData}`).then(function(response){
 
 
-           vm.scrollToEnd()
+            vm.initializeScrollArea()
 
 
          }).catch(function(error){
@@ -310,8 +315,7 @@
 
          vm.$socket.on('messageNotification', function(data){
        var vm = this
-        console.log('test')
-       console.log('myunread',data)
+
 
 
        for(var i =0; i<vm.myFriends.length; i++){
@@ -323,10 +327,6 @@
 
            Vue.set(vm.myFriends[i], 'notif', vm.myFriends[i]['notif'] +=1)
 
-           console.log( 'krname', data.myunread.friend['kr_name'])
-
-
-           console.log(data.myunread.currentUserName)
 
          }
 
@@ -517,6 +517,86 @@
        },
 
 
+       scrollHandler(myScroll){
+
+ var vm = this
+         if(myScroll.position === 0 && vm.max === false){
+
+
+           vm.myFriend = new FormData();
+
+
+           vm.myFriend.append('secondUser', vm.secondUser)
+           vm.myFriend.append('scrollValue', vm.scrollValue)
+
+           axios.post('/api/getMessages', vm.myFriend).then(function(response){
+
+
+           vm.max = response.data.max
+
+
+
+
+
+
+           Vue.set(vm.$data, 'myMessages', response.data.messages)
+
+
+           vm.scrollValue+=20
+           vm.currentUserName = response.data.currentUserName
+           vm.secondUserName = response.data.secondUserName
+
+
+
+
+           }).catch(function(error){
+
+             console.log(error)
+           })
+
+
+
+
+         }
+
+
+
+
+
+
+
+
+
+
+       },
+
+       initializeScrollArea(){
+
+
+
+         var vm = this
+
+
+
+
+         setTimeout(() => {
+       	vm.$refs.myScroll.setScrollPosition(vm.$refs.scrollInner.scrollHeight, 150)
+       }, 250)
+
+
+
+
+},
+
+       upload() {
+
+         var vm = this
+       vm.$refs.uploader.pick()
+      },
+
+
+
+
        searchFor: function (list, value, column) {
              return list.filter(function (item) {
                return item[column].includes(value)
@@ -527,7 +607,7 @@
        initScroll(){
        var vm = this
 
-       var container = vm.$el.querySelector('.suggested > .list ')
+       var container = vm.$el.querySelector('.chat-page ')
        container.addEventListener("scroll", ()=>{
 
        if(container.scrollTop === 0 && vm.max === false){
@@ -544,7 +624,7 @@
 
          vm.max = response.data.max
 
-         console.log(response.data.scrollValue)
+
 
 
 
@@ -588,14 +668,23 @@
 
 
 
+
+
+
        sendMessage(){
 
        var vm  = this
 
+       const last = vm.message
 
-       vm.message = vm.message.replace(/(\w{29})$/, '$1 ');
+       var spaceCount = (vm.message.split(" ").length - 1);
+
+
+
+
+
        vm.tempMessage = vm.message
-       console.log('char length', vm.message.length)
+
        vm.myMessages.push({'avatar' : 'https://scontent.ficn2-1.fna.fbcdn.net/v/t1.0-1/p160x160/29468236_901369833374211_8734349036217171968_n.jpg?_nc_cat=0&oh=f8f7428a3e9e807d58b3ef91ef215062&oe=5B760837', 'name': vm.currentUserName, 'message': vm.message})
 
 
@@ -626,13 +715,17 @@
          })
 
 
+
+
+
+          vm.initializeScrollArea()
        },
 
 
 
        scrollToEnd () {
          var vm = this
-               var container = vm.$el.querySelector('.suggested > .list ')
+               var container = vm.$el.querySelector('.chat-page ')
                container.scrollTop = container.scrollHeight
 
 
@@ -671,13 +764,11 @@
 
             await axios.get('api/getFriendLists').then(function(response){
 
-              console.log('waa',response.data.unreadMessages)
+
 
               Vue.set(vm.$data, 'friendLatestMessage', response.data.friendLatestMessage)
               Vue.set(vm.$data, 'myLatestMessage', response.data.myLatestMessage)
 
-                   console.log('mylatest', vm.myLatestMessage)
-                   console.log('friendlist', response.data.friendLists)
          let unreadMessages = response.data.unreadMessages
        Vue.set(vm.$data, 'myFriends', response.data.friendLists)
        for(var i =0; i<vm.myFriends.length; i++){
@@ -733,6 +824,8 @@
            selectFriend(id, chatroute, item, index){
 
        var vm = this
+
+
        vm.max = false
        vm.scrollValue = 20
        vm.offFunction = true
@@ -754,13 +847,12 @@
        vm.myFriend.append('secondUser', id)
        vm.myFriend.append('scrollValue', vm.scrollValue)
 
+
+
        axios.post('/api/getMessages', vm.myFriend).then(function(response){
 
 
-         console.log('my messages', response.data.messages)
 
-       console.log(response.data.scrollValue)
-         console.log('messages length', response.data.messages.length)
        vm.max = response.data.max
 
        Vue.set(vm.$data, 'myMessages', response.data.messages)
@@ -771,14 +863,14 @@
        vm.secondUserName = response.data.secondUserName
 
 
+
        if(vm.myMessages){
+
+         vm.initializeScrollArea()
 
        Vue.set(vm.myFriends[index], 'notif', 0)
 
-       vm.scrollToEnd()
 
-
-       vm.initScroll()
 
        }
 
@@ -806,33 +898,39 @@
 
   <style>
 
-  body{
-
-    position: fixed;
-    overflow-y: hidden;
-    top: 0; right: 0; bottom: 0; left: 0;
-
-  }
-
-.chat-page{
+  body {
 
 
-    max-height: 80vh;
 
-    overflow: auto;
-    overflow-x: hidden;
-    margin-bottom: 20px;
+
+
+
+
 
 }
 
-::-webkit-scrollbar {
-    display: none;
+.chat-page {
+  overflow: auto;
+  overflow-x: hidden;
 }
 
 .chat-message .q-icon {
   margin-right: 10px;
+  min-height: 75px;
 }
 
+
+::-webkit-scrollbar {
+    display: none;
+
+
+}
+
+#chatScroll{
+
+  overflow: auto;
+  overflow-x: hidden;
+}
 
 
   </style>
